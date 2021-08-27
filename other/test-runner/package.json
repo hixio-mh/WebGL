@@ -19,8 +19,12 @@
         "start": "node index.js"
     },
     "dependencies": {
+ snyk-fix-021dc3f46cb59878789d82b61b6940c7
         "express" : "4.0.0",
         "optimist": "0.3.x",
+        "express" : "3.x",
+        "optimist": "0.6.1",
+ master
         "rimraf": "2.x",
         "tar.gz": "0.x",
         "shelljs": "0.x"

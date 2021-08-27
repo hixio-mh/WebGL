@@ -234,6 +234,12 @@
 	<xsl:when test="@require='true'">
 	  <p> Implementations must also support the <xsl:apply-templates select="."/> extension. </p>
 	</xsl:when>
+	<xsl:when test="@require='webgl1'">
+	  <p> In WebGL 1.0 contexts, implementations must also support the <xsl:apply-templates select="."/> extension. </p>
+	</xsl:when>
+	<xsl:when test="@require='webgl2'">
+	  <p> In WebGL 2.0 contexts, implementations must also support the <xsl:apply-templates select="."/> extension. </p>
+	</xsl:when>
 	<xsl:otherwise>
 	  <p> Written against the <xsl:apply-templates select="."/> specification. </p>
 	</xsl:otherwise>
@@ -411,7 +417,7 @@
 <xsl:template match="interface" mode="newfun">
   <dt class="idl-code">
 	<xsl:if test="@noobject = 'true'">
-	  <xsl:text>[LegacyNoInterfaceObject]</xsl:text><br/>
+	  <xsl:text>[Exposed=(Window,Worker), LegacyNoInterfaceObject]</xsl:text><br/>
 	</xsl:if>
     <xsl:text>interface </xsl:text>
     <em><xsl:value-of select="@name" /></em>

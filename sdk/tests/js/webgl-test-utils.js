@@ -1283,7 +1283,7 @@ var checkCanvasRectColor = function(gl, x, y, width, height, color, opt_errorRan
           was += "," + buf[offset + j];
         }
         differentFn('at (' + (x + (i % width)) + ', ' + (y + Math.floor(i / width)) +
-                    ') expected: ' + color + ' was ' + was);
+                    ') expected: ' + color + ' was ' + was, buf);
         return;
       }
     }
@@ -1733,6 +1733,10 @@ var glErrorShouldBe = function(gl, glErrors, opt_msg) {
   return glErrorShouldBeImpl(gl, glErrors, true, opt_msg);
 };
 
+const glErrorAssert = function(gl, glErrors, opt_msg) {
+  return glErrorShouldBeImpl(gl, glErrors, false, opt_msg);
+};
+
 /**
  * Tests that the given framebuffer has a specific status
  * @param {!WebGLRenderingContext} gl The WebGLRenderingContext to use.
@@ -1751,13 +1755,23 @@ var framebufferStatusShouldBe = function(gl, target, glStatuses, opt_msg) {
     return glEnumToString(gl, status);
   }).join(' or ');
   if (ndx < 0) {
-    var msg = "checkFramebufferStatus expected" + ((glStatuses.length > 1) ? " one of: " : ": ");
-    testFailed(msg + expected +  ". Was " + glEnumToString(gl, status) + " : " + opt_msg);
-  } else {
-    var msg = "checkFramebufferStatus was " + ((glStatuses.length > 1) ? "one of: " : "expected value: ");
-    testPassed(msg + expected + " : " + opt_msg);
+    let msg = "checkFramebufferStatus expected" + ((glStatuses.length > 1) ? " one of: " : ": ") +
+      expected +  ". Was " + glEnumToString(gl, status);
+    if (opt_msg) {
+      msg += ": " + opt_msg;
+    }
+    testFailed(msg);
+    return false;
   }
-  return status;
+  let msg = `checkFramebufferStatus was ${glEnumToString(gl, status)}`;
+  if (glStatuses.length > 1) {
+    msg += `, one of: ${expected}`;
+  }
+  if (opt_msg) {
+    msg += ": " + opt_msg;
+  }
+  testPassed(msg);
+  return [status];
 }
 
 /**
@@ -2913,14 +2927,6 @@ var requestAnimFrame = function(callback) {
   _requestAnimFrame.call(window, callback);
 };
 
-/**
- * Provides video.requestVideoFrameCallback in a cross browser way.
- * Returns a property, or undefined if unsuported.
- */
-var getRequestVidFrameCallback = function() {
-  return HTMLVideoElement.prototype["requestVideoFrameCallback"];
-};
-
 var _cancelAnimFrame;
 
 /**
@@ -3122,29 +3128,30 @@ var runSteps = function(steps) {
  * @param {!function(!HTMLVideoElement): void} callback Function to call when
  *        video is ready.
  */
-var startPlayingAndWaitForVideo = function(video, callback) {
-  var rvfc = getRequestVidFrameCallback();
-  if (rvfc === undefined) {
-    var timeWatcher = function() {
-      if (video.currentTime > 0) {
-        callback(video);
-      } else {
-        requestAnimFrame.call(window, timeWatcher);
-      }
-    };
-
-    timeWatcher();
-  } else {
-    // Calls video.requestVideoFrameCallback(_ => { callback(video) })
-    rvfc.call(video, _ => { callback(video) });
+async function startPlayingAndWaitForVideo(video, callback) {
+  if (video.error) {
+    testFailed('Video failed to load: ' + video.error);
+    return;
   }
 
   video.loop = true;
   video.muted = true;
   // See whether setting the preload flag de-flakes video-related tests.
   video.preload = 'auto';
-  video.play();
-};
+
+  try {
+    await video.play();
+  } catch (e) {
+    testFailed('video.play failed: ' + e);
+    return;
+  }
+
+  if (video.requestVideoFrameCallback) {
+    await new Promise(go => video.requestVideoFrameCallback(go));
+  }
+
+  callback(video);
+}
 
 var getHost = function(url) {
   url = url.replace("\\", "/");
@@ -3319,12 +3326,12 @@ function comparePixels(cmp, ref, tolerance, diff) {
 }
 
 function destroyContext(gl) {
-  gl.canvas.width = 1;
-  gl.canvas.height = 1;
   const ext = gl.getExtension('WEBGL_lose_context');
   if (ext) {
     ext.loseContext();
   }
+  gl.canvas.width = 1;
+  gl.canvas.height = 1;
 }
 
 function destroyAllContexts() {
@@ -3434,6 +3441,7 @@ var API = {
   getAttribMap: getAttribMap,
   getUniformMap: getUniformMap,
   glEnumToString: glEnumToString,
+  glErrorAssert: glErrorAssert,
   glErrorShouldBe: glErrorShouldBe,
   glTypeToTypedArrayType: glTypeToTypedArrayType,
   hasAttributeCaseInsensitive: hasAttributeCaseInsensitive,
